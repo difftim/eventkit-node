@@ -1,8 +1,8 @@
 {
-  "name": "eventkit-node",
+  "name": "@difftim/eventkit-node",
   "author": "Deniz Acay",
   "license": "MPL-2.0",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -34,6 +34,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dacay/eventkit-node.git"
+    "url": "https://github.com/difftim/eventkit-node.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
   }
 }

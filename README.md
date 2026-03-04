@@ -1,5 +1,7 @@
 # EventKit Node.js Addon
 
+This fork is published as `@difftim/eventkit-node` and includes the crash fix from [dacay/eventkit-node#1](https://github.com/dacay/eventkit-node/pull/1).
+
 A Node.js native addon that provides access to macOS [EventKit](https://developer.apple.com/documentation/eventkit) functionality, allowing you to work with calendars and reminders.
 
 This library is a bridge between Node.js and Apple's EventKit framework, providing a JavaScript-friendly API for managing calendars, events, and reminders on macOS.
@@ -13,13 +15,20 @@ This library is a bridge between Node.js and Apple's EventKit framework, providi
 ## Installation
 
 ```bash
-npm install eventkit-node
+npm install @difftim/eventkit-node
+```
+
+For GitHub Packages authentication:
+
+```bash
+echo "@difftim:registry=https://npm.pkg.github.com" >> ~/.npmrc
+echo "//npm.pkg.github.com/:_authToken=\${GITHUB_TOKEN}" >> ~/.npmrc
 ```
 
 ## Quick Example
 
 ```javascript
-const { requestFullAccessToEvents, getCalendars } = require('eventkit-node');
+const { requestFullAccessToEvents, getCalendars } = require('@difftim/eventkit-node');
 
 async function main() {
   // Request access to calendars
