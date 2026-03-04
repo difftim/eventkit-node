@@ -254,6 +254,34 @@ private:
     bool granted_;
 };
 
+struct WorkerDispatchContext {
+    Napi::AsyncWorker *worker;
+    Napi::ThreadSafeFunction tsfn;
+
+    WorkerDispatchContext(Napi::Env env, Napi::AsyncWorker *worker, const char *resourceName)
+        : worker(worker),
+          tsfn(Napi::ThreadSafeFunction::New(
+              env,
+              Napi::Function::New(env, [](const Napi::CallbackInfo&) {}),
+              resourceName,
+              0,
+              1
+          )) {}
+
+    void QueueAndDestroy() {
+        napi_status status = tsfn.NonBlockingCall(worker, [](Napi::Env, Napi::Function, Napi::AsyncWorker *queuedWorker) {
+            queuedWorker->Queue();
+        });
+        tsfn.Release();
+
+        if (status != napi_ok) {
+            delete worker;
+        }
+
+        delete this;
+    }
+};
+
 // Class to handle the save calendar operation
 class SaveCalendarWorker : public Napi::AsyncWorker {
 public:
@@ -358,6 +386,7 @@ Napi::Value RequestCalendarAccess(const Napi::CallbackInfo& info) {
     
     // Create the worker
     CalendarAccessWorker* worker = new CalendarAccessWorker(deferred);
+    WorkerDispatchContext *dispatchContext = new WorkerDispatchContext(env, worker, "CalendarAccessRequest");
     
     // Create the EventKitBridge
     EventKitBridge *bridge = GetSharedBridge();
@@ -365,7 +394,7 @@ Napi::Value RequestCalendarAccess(const Napi::CallbackInfo& info) {
     // Request calendar access
     [bridge requestCalendarAccessWithCompletion:^(BOOL granted) {
         worker->SetGranted(granted);
-        worker->Queue();
+        dispatchContext->QueueAndDestroy();
     }];
     
     // Return the promise
@@ -381,6 +410,7 @@ Napi::Value RequestRemindersAccess(const Napi::CallbackInfo& info) {
     
     // Create the worker
     RemindersAccessWorker* worker = new RemindersAccessWorker(deferred);
+    WorkerDispatchContext *dispatchContext = new WorkerDispatchContext(env, worker, "RemindersAccessRequest");
     
     // Create the EventKitBridge
     EventKitBridge *bridge = GetSharedBridge();
@@ -388,7 +418,7 @@ Napi::Value RequestRemindersAccess(const Napi::CallbackInfo& info) {
     // Request reminders access
     [bridge requestRemindersAccessWithCompletion:^(BOOL granted) {
         worker->SetGranted(granted);
-        worker->Queue();
+        dispatchContext->QueueAndDestroy();
     }];
     
     // Return the promise
@@ -502,6 +532,7 @@ Napi::Value RequestWriteOnlyAccessToEvents(const Napi::CallbackInfo& info) {
     
     // Create the worker
     CalendarAccessWorker* worker = new CalendarAccessWorker(deferred);
+    WorkerDispatchContext *dispatchContext = new WorkerDispatchContext(env, worker, "WriteOnlyAccessRequest");
     
     // Create the EventKitBridge
     EventKitBridge *bridge = GetSharedBridge();
@@ -509,7 +540,7 @@ Napi::Value RequestWriteOnlyAccessToEvents(const Napi::CallbackInfo& info) {
     // Request write-only access to events
     [bridge requestWriteOnlyAccessToEventsWithCompletion:^(BOOL granted) {
         worker->SetGranted(granted);
-        worker->Queue();
+        dispatchContext->QueueAndDestroy();
     }];
     
     // Return the promise
@@ -654,7 +685,7 @@ Napi::Value RemoveCalendar(const Napi::CallbackInfo& info) {
     // Create the worker
     RemoveCalendarWorker* worker = new RemoveCalendarWorker(deferred);
     
-    // Create the EventKitBridge
+    // Get the EventKitBridge
     EventKitBridge *bridge = GetSharedBridge();
     
     // Remove the calendar
@@ -1160,19 +1191,15 @@ Napi::Value GetRemindersWithPredicate(const Napi::CallbackInfo& info) {
     
     // Create a worker to handle the async operation, passing the predicate object
     RemindersFetchWorker* worker = new RemindersFetchWorker(deferred, predicateObj);
+    WorkerDispatchContext *dispatchContext = new WorkerDispatchContext(env, worker, "RemindersFetch");
     
     // Call the Swift method to fetch reminders
     EventKitBridge *bridge = GetSharedBridge();
     [bridge getRemindersWithPredicate:predicate completion:^(NSArray<Reminder *> * _Nullable reminders) {
         if (reminders) {
             worker->SetReminders(reminders);
-            worker->Queue();
-        } else {
-            // If reminders is nil, resolve with an empty array
-            Napi::Array emptyArray = Napi::Array::New(env);
-            deferred.Resolve(emptyArray);
-            delete worker; // Clean up the worker since we're not queuing it
         }
+        dispatchContext->QueueAndDestroy();
     }];
     
     return deferred.Promise();
